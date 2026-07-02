@@ -20,15 +20,17 @@
     const importFile = document.getElementById('import-file');
 
     const modalOverlay = document.getElementById('modal-overlay');
-    const modalBpm = document.getElementById('modal-bpm');
+    const modalTitle = document.getElementById('modal-title');
     const songNameInput = document.getElementById('song-name');
+    const modalBpmInput = document.getElementById('modal-bpm-input');
     const modalCancel = document.getElementById('modal-cancel');
     const modalConfirm = document.getElementById('modal-confirm');
 
     // ---------- Состояние ----------
     let taps = [];
-    let lastValidBpm = null;          // последний вычисленный BPM (сохраняется даже после паузы)
-    let currentBpm = null;            // для кнопки "Сохранить" (равен lastValidBpm, если есть)
+    let lastValidBpm = null;
+    let currentBpm = null;  // для кнопки "Сохранить"
+    let editingId = null;   // ID записи при редактировании
 
     let records = [];
 
@@ -102,7 +104,7 @@
             btn.addEventListener('click', () => {
                 const id = btn.dataset.id;
                 const rec = records.find(r => r.id === id);
-                if (rec) editRecord(rec);
+                if (rec) openEditModal(rec);
             });
         });
 
@@ -124,45 +126,12 @@
         return div.innerHTML;
     }
 
-    // ---------- Редактирование записи ----------
-    function editRecord(rec) {
-        modalBpm.textContent = rec.bpm;
-        songNameInput.value = rec.name;
-        modalOverlay.dataset.editId = rec.id;
-        modalConfirm.textContent = 'Обновить';
-        modalOverlay.classList.remove('hidden');
-        songNameInput.focus();
-    }
-
-    function saveNewRecord(name, bpm) {
-        const newRec = {
-            id: crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random(),
-            name: name.trim(),
-            bpm: bpm,
-            timestamp: Date.now()
-        };
-        records.push(newRec);
-        saveRecords();
-        renderRecords();
-    }
-
-    function updateRecord(id, newName) {
-        const rec = records.find(r => r.id === id);
-        if (rec) {
-            rec.name = newName.trim();
-            rec.timestamp = Date.now();
-            saveRecords();
-            renderRecords();
-        }
-    }
-
     // ---------- Модальное окно ----------
-    function openSaveModal() {
-        if (currentBpm === null) return;
-        modalBpm.textContent = currentBpm;
-        songNameInput.value = '';
-        modalOverlay.dataset.editId = '';
-        modalConfirm.textContent = 'Сохранить';
+    function openModal(title, name, bpm, editId) {
+        modalTitle.textContent = title;
+        songNameInput.value = name || '';
+        modalBpmInput.value = bpm || '';
+        editingId = editId || null;
         modalOverlay.classList.remove('hidden');
         songNameInput.focus();
     }
@@ -170,36 +139,75 @@
     function closeModal() {
         modalOverlay.classList.add('hidden');
         songNameInput.value = '';
-        delete modalOverlay.dataset.editId;
+        modalBpmInput.value = '';
+        editingId = null;
     }
 
-    modalCancel.addEventListener('click', closeModal);
-    modalOverlay.addEventListener('click', (e) => {
-        if (e.target === modalOverlay) closeModal();
-    });
+    // Открытие для новой записи
+    function openSaveModal() {
+        if (currentBpm === null) {
+            alert('Сначала вычислите BPM, нажимая в такт');
+            return;
+        }
+        openModal('Сохранить песню', '', currentBpm, null);
+    }
 
-    modalConfirm.addEventListener('click', () => {
+    // Открытие для редактирования
+    function openEditModal(rec) {
+        openModal('Редактировать запись', rec.name, rec.bpm, rec.id);
+    }
+
+    // Сохранение/обновление
+    function handleModalConfirm() {
         const name = songNameInput.value.trim();
+        const bpm = parseInt(modalBpmInput.value);
+
         if (!name) {
             alert('Введите название песни');
             return;
         }
-        const editId = modalOverlay.dataset.editId;
-        if (editId) {
-            updateRecord(editId, name);
-        } else {
-            const bpm = parseInt(modalBpm.textContent);
-            if (!isNaN(bpm) && bpm > 0) {
-                saveNewRecord(name, bpm);
-            } else {
-                alert('Ошибка: BPM не определён');
+        if (isNaN(bpm) || bpm < 20 || bpm > 300) {
+            alert('Введите корректный BPM (от 20 до 300)');
+            return;
+        }
+
+        if (editingId) {
+            // Обновление существующей записи
+            const rec = records.find(r => r.id === editingId);
+            if (rec) {
+                rec.name = name;
+                rec.bpm = bpm;
+                rec.timestamp = Date.now();
+                saveRecords();
+                renderRecords();
             }
+        } else {
+            // Новая запись
+            const newRec = {
+                id: crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random(),
+                name: name,
+                bpm: bpm,
+                timestamp: Date.now()
+            };
+            records.push(newRec);
+            saveRecords();
+            renderRecords();
         }
         closeModal();
+    }
+
+    // ---------- Обработчики модалки ----------
+    modalCancel.addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) closeModal();
     });
+    modalConfirm.addEventListener('click', handleModalConfirm);
 
     songNameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') modalConfirm.click();
+        if (e.key === 'Enter') modalBpmInput.focus();
+    });
+    modalBpmInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleModalConfirm();
     });
 
     // ---------- Логика Tap Tempo (с сохранением BPM) ----------
@@ -207,7 +215,6 @@
         const count = taps.length;
         tapCount.textContent = `Нажатий: ${count}`;
 
-        // Если есть хотя бы 2 нажатия, вычисляем BPM и сохраняем его
         if (count >= 2) {
             let intervals = [];
             for (let i = 1; i < taps.length; i++) {
@@ -217,12 +224,9 @@
             const bpm = Math.round(60 / (avgInterval / 1000));
             if (bpm > 20 && bpm < 300) {
                 lastValidBpm = bpm;
-            } else {
-                // Если BPM вне диапазона, оставляем предыдущий lastValidBpm (не обновляем)
             }
         }
 
-        // Отображение текущего BPM
         if (lastValidBpm !== null) {
             bpmValue.textContent = lastValidBpm;
             currentBpm = lastValidBpm;
@@ -254,12 +258,9 @@
 
     function addTap() {
         const now = Date.now();
-
-        // Если прошло много времени после последнего нажатия — начинаем новый отсчёт
         if (taps.length > 0 && (now - taps[taps.length - 1]) > TIMEOUT_MS) {
-            taps = [];                // сбрасываем историю, но lastValidBpm остаётся
+            taps = [];
         }
-
         taps.push(now);
         if (taps.length > MAX_TAPS) {
             taps.shift();
@@ -269,13 +270,13 @@
 
     function resetTaps() {
         taps = [];
-        lastValidBpm = null;          // полный сброс
+        lastValidBpm = null;
         updateUI();
         bpmValue.style.color = '#e94560';
         setTimeout(() => bpmValue.style.color = '', 200);
     }
 
-    // ---------- Обработчики событий ----------
+    // ---------- Обработчики основных кнопок ----------
     tapButton.addEventListener('click', addTap);
     tapButton.addEventListener('touchstart', (e) => {
         e.preventDefault();
@@ -333,7 +334,7 @@
                 if (parts.length >= 2) {
                     const bpm = parseInt(parts[0]);
                     const name = parts[1].trim();
-                    if (!isNaN(bpm) && name) {
+                    if (!isNaN(bpm) && name && bpm >= 20 && bpm <= 300) {
                         const exists = records.some(r => r.name === name && r.bpm === bpm);
                         if (!exists) {
                             records.push({

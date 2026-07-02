@@ -282,15 +282,11 @@ hr {
     margin-bottom: 0.5rem;
 }
 
-.modal p {
-    margin-bottom: 1rem;
-    opacity: 0.8;
-}
-
 .modal label {
     display: block;
     text-align: left;
     margin-bottom: 0.3rem;
+    margin-top: 0.8rem;
     font-size: 0.9rem;
 }
 
@@ -303,7 +299,6 @@ hr {
     color: #fff;
     font-size: 1rem;
     outline: none;
-    margin-bottom: 1.2rem;
 }
 
 .modal input:focus {
@@ -314,6 +309,7 @@ hr {
     display: flex;
     gap: 10px;
     justify-content: flex-end;
+    margin-top: 1.2rem;
 }
 
 .modal-actions button {
