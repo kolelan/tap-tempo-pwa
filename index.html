@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tap Tempo</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <!-- Иконки для разных устройств (можно добавить) -->
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="theme-color" content="#1a1a2e">
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Tap Tempo</h1>
+        <div class="bpm-display">
+            <span id="bpm-value">--</span>
+            <span class="bpm-label">BPM</span>
+        </div>
+        <button id="tap-button">Нажмите в такт</button>
+        <div class="info">
+            <span id="tap-count">Нажатий: 0</span>
+            <span id="last-tap">Последний: --</span>
+        </div>
+        <button id="reset-button" class="reset">Сбросить</button>
+    </div>
+    <script src="app.js"></script>
+    <script>
+        // Регистрация Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log('SW зарегистрирован'))
+                .catch(err => console.log('Ошибка SW:', err));
+        }
+    </script>
+</body>
+</html>

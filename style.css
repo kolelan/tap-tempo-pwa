@@ -1,0 +1,104 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #1a1a2e;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.container {
+    background: #16213e;
+    border-radius: 40px;
+    padding: 2rem 1.5rem;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    text-align: center;
+}
+
+h1 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+.bpm-display {
+    margin: 2rem 0;
+}
+
+#bpm-value {
+    font-size: 5rem;
+    font-weight: 700;
+    display: block;
+    line-height: 1;
+    color: #e94560;
+    transition: all 0.1s ease;
+}
+
+.bpm-label {
+    font-size: 1.2rem;
+    opacity: 0.7;
+    letter-spacing: 4px;
+}
+
+#tap-button {
+    width: 100%;
+    padding: 1.5rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    background: #e94560;
+    border: none;
+    border-radius: 60px;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.2s;
+    box-shadow: 0 8px 0 #a82f44;
+    margin: 1.5rem 0 1rem;
+    touch-action: manipulation;
+}
+
+#tap-button:active {
+    transform: scale(0.96);
+    background: #d63851;
+}
+
+.info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin: 0.5rem 0;
+}
+
+.reset {
+    background: transparent;
+    border: 1px solid #555;
+    color: #aaa;
+    padding: 0.5rem 1.5rem;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: 0.2s;
+    margin-top: 0.5rem;
+}
+
+.reset:hover {
+    background: #333;
+    color: #fff;
+}
+
+.reset:active {
+    transform: scale(0.95);
+}
