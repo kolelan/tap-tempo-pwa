@@ -2,7 +2,7 @@
   "name": "Tap Tempo",
   "short_name": "TapTempo",
   "description": "Вычисляйте BPM нажатиями и сохраняйте песни",
-  "start_url": "/index.html",
+  "start_url": "/tap-tempo/",        // или "/tap-tempo/index.php" или /index.html в случае расположения на домене
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
