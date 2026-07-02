@@ -6,27 +6,71 @@
     <title>Tap Tempo</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
-    <!-- Иконки для разных устройств (можно добавить) -->
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <meta name="theme-color" content="#1a1a2e">
 </head>
 <body>
     <div class="container">
         <h1>🎵 Tap Tempo</h1>
+
+        <!-- Блок текущего BPM -->
         <div class="bpm-display">
             <span id="bpm-value">--</span>
             <span class="bpm-label">BPM</span>
         </div>
-        <button id="tap-button">Нажмите в такт</button>
+
+        <!-- Кнопка тапа и сохранения -->
+        <div class="action-row">
+            <button id="tap-button">Нажмите в такт</button>
+            <button id="save-button" class="save-btn" disabled>Сохранить</button>
+        </div>
+
         <div class="info">
             <span id="tap-count">Нажатий: 0</span>
             <span id="last-tap">Последний: --</span>
         </div>
         <button id="reset-button" class="reset">Сбросить</button>
+
+        <!-- Секция управления записями -->
+        <hr>
+        <div class="records-header">
+            <h2>Сохранённые песни</h2>
+            <div class="toolbar">
+                <input type="text" id="filter-input" placeholder="Фильтр по названию...">
+                <select id="sort-select">
+                    <option value="name-asc">По названию (А→Я)</option>
+                    <option value="name-desc">По названию (Я→А)</option>
+                    <option value="bpm-asc">По BPM (возр.)</option>
+                    <option value="bpm-desc">По BPM (убыв.)</option>
+                    <option value="newest">Сначала новые</option>
+                    <option value="oldest">Сначала старые</option>
+                </select>
+                <button id="export-btn" class="tool-btn">📤 Экспорт CSV</button>
+                <button id="import-btn" class="tool-btn">📥 Импорт CSV</button>
+                <input type="file" id="import-file" accept=".csv" style="display:none">
+            </div>
+        </div>
+
+        <!-- Список записей -->
+        <div id="records-list" class="records-list"></div>
+
+        <!-- Модальное окно для ввода названия -->
+        <div id="modal-overlay" class="modal-overlay hidden">
+            <div class="modal">
+                <h3>Сохранить песню</h3>
+                <p>Текущий BPM: <strong id="modal-bpm">--</strong></p>
+                <label for="song-name">Название песни:</label>
+                <input type="text" id="song-name" placeholder="Введите название..." autofocus>
+                <div class="modal-actions">
+                    <button id="modal-cancel">Отмена</button>
+                    <button id="modal-confirm" class="save-btn">Сохранить</button>
+                </div>
+            </div>
+        </div>
     </div>
+
     <script src="app.js"></script>
     <script>
-        // Регистрация Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(() => console.log('SW зарегистрирован'))

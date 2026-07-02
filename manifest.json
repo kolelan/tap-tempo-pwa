@@ -1,7 +1,7 @@
 {
   "name": "Tap Tempo",
   "short_name": "TapTempo",
-  "description": "Вычисляйте BPM нажатиями",
+  "description": "Вычисляйте BPM нажатиями и сохраняйте песни",
   "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#1a1a2e",
