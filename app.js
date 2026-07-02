@@ -1,7 +1,7 @@
 (function() {
     // ---------- Конфигурация ----------
     const MAX_TAPS = 12;
-    const TIMEOUT_MS = 3000;
+    const TIMEOUT_MS = 3000;          // пауза для сброса истории нажатий (но BPM не исчезает)
     const STORAGE_KEY = 'tapTempoRecords';
 
     // ---------- DOM-элементы ----------
@@ -12,7 +12,6 @@
     const tapCount = document.getElementById('tap-count');
     const lastTap = document.getElementById('last-tap');
 
-    // Элементы записей
     const recordsList = document.getElementById('records-list');
     const filterInput = document.getElementById('filter-input');
     const sortSelect = document.getElementById('sort-select');
@@ -20,7 +19,6 @@
     const importBtn = document.getElementById('import-btn');
     const importFile = document.getElementById('import-file');
 
-    // Модальное окно
     const modalOverlay = document.getElementById('modal-overlay');
     const modalBpm = document.getElementById('modal-bpm');
     const songNameInput = document.getElementById('song-name');
@@ -29,21 +27,16 @@
 
     // ---------- Состояние ----------
     let taps = [];
-    let timeoutId = null;
-    let currentBpm = null;          // число или null, если не вычислен
+    let lastValidBpm = null;          // последний вычисленный BPM (сохраняется даже после паузы)
+    let currentBpm = null;            // для кнопки "Сохранить" (равен lastValidBpm, если есть)
 
-    // Записи: массив { id, name, bpm, timestamp }
     let records = [];
 
     // ---------- Работа с localStorage ----------
     function loadRecords() {
         try {
             const data = localStorage.getItem(STORAGE_KEY);
-            if (data) {
-                records = JSON.parse(data);
-            } else {
-                records = [];
-            }
+            records = data ? JSON.parse(data) : [];
         } catch (e) {
             records = [];
         }
@@ -60,7 +53,6 @@
 
         let filtered = records.filter(rec => rec.name.toLowerCase().includes(filter));
 
-        // Сортировка
         switch (sortType) {
             case 'name-asc':
                 filtered.sort((a, b) => a.name.localeCompare(b.name));
@@ -106,19 +98,16 @@
         });
         recordsList.innerHTML = html;
 
-        // Навешиваем обработчики на кнопки редактирования и удаления
         document.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', () => {
                 const id = btn.dataset.id;
                 const rec = records.find(r => r.id === id);
-                if (rec) {
-                    editRecord(rec);
-                }
+                if (rec) editRecord(rec);
             });
         });
 
         document.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', () => {
                 const id = btn.dataset.id;
                 if (confirm('Удалить эту запись?')) {
                     records = records.filter(r => r.id !== id);
@@ -129,25 +118,22 @@
         });
     }
 
-    // Простая защита от XSS
     function escapeHtml(str) {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
     }
 
-    // ---------- Редактирование записи (через модалку) ----------
+    // ---------- Редактирование записи ----------
     function editRecord(rec) {
-        // Переиспользуем модалку для редактирования
         modalBpm.textContent = rec.bpm;
         songNameInput.value = rec.name;
-        modalOverlay.dataset.editId = rec.id;   // запоминаем, что редактируем
+        modalOverlay.dataset.editId = rec.id;
         modalConfirm.textContent = 'Обновить';
         modalOverlay.classList.remove('hidden');
         songNameInput.focus();
     }
 
-    // ---------- Сохранение новой записи (из модалки) ----------
     function saveNewRecord(name, bpm) {
         const newRec = {
             id: crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random(),
@@ -160,23 +146,22 @@
         renderRecords();
     }
 
-    // ---------- Обновление существующей записи ----------
     function updateRecord(id, newName) {
         const rec = records.find(r => r.id === id);
         if (rec) {
             rec.name = newName.trim();
-            rec.timestamp = Date.now(); // обновим время, чтобы поднялось в списке
+            rec.timestamp = Date.now();
             saveRecords();
             renderRecords();
         }
     }
 
-    // ---------- Модальное окно: открыть для сохранения текущего BPM ----------
+    // ---------- Модальное окно ----------
     function openSaveModal() {
         if (currentBpm === null) return;
         modalBpm.textContent = currentBpm;
         songNameInput.value = '';
-        modalOverlay.dataset.editId = ''; // чистый режим добавления
+        modalOverlay.dataset.editId = '';
         modalConfirm.textContent = 'Сохранить';
         modalOverlay.classList.remove('hidden');
         songNameInput.focus();
@@ -188,7 +173,6 @@
         delete modalOverlay.dataset.editId;
     }
 
-    // ---------- Обработчики модалки ----------
     modalCancel.addEventListener('click', closeModal);
     modalOverlay.addEventListener('click', (e) => {
         if (e.target === modalOverlay) closeModal();
@@ -202,10 +186,8 @@
         }
         const editId = modalOverlay.dataset.editId;
         if (editId) {
-            // Редактирование
             updateRecord(editId, name);
         } else {
-            // Новое сохранение
             const bpm = parseInt(modalBpm.textContent);
             if (!isNaN(bpm) && bpm > 0) {
                 saveNewRecord(name, bpm);
@@ -216,77 +198,84 @@
         closeModal();
     });
 
-    // Обработчик Enter в поле ввода
     songNameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            modalConfirm.click();
-        }
+        if (e.key === 'Enter') modalConfirm.click();
     });
 
-    // ---------- Логика Tap Tempo ----------
+    // ---------- Логика Tap Tempo (с сохранением BPM) ----------
     function updateUI() {
         const count = taps.length;
         tapCount.textContent = `Нажатий: ${count}`;
 
-        if (count < 2) {
+        // Если есть хотя бы 2 нажатия, вычисляем BPM и сохраняем его
+        if (count >= 2) {
+            let intervals = [];
+            for (let i = 1; i < taps.length; i++) {
+                intervals.push(taps[i] - taps[i-1]);
+            }
+            const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+            const bpm = Math.round(60 / (avgInterval / 1000));
+            if (bpm > 20 && bpm < 300) {
+                lastValidBpm = bpm;
+            } else {
+                // Если BPM вне диапазона, оставляем предыдущий lastValidBpm (не обновляем)
+            }
+        }
+
+        // Отображение текущего BPM
+        if (lastValidBpm !== null) {
+            bpmValue.textContent = lastValidBpm;
+            currentBpm = lastValidBpm;
+            saveButton.disabled = false;
+        } else {
             bpmValue.textContent = '--';
-            lastTap.textContent = 'Последний: --';
             currentBpm = null;
             saveButton.disabled = true;
-            return;
         }
 
-        let intervals = [];
-        for (let i = 1; i < taps.length; i++) {
-            intervals.push(taps[i] - taps[i-1]);
-        }
-        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-        const bpm = Math.round(60 / (avgInterval / 1000));
-        const displayBpm = (bpm > 20 && bpm < 300) ? bpm : '--';
-
-        bpmValue.textContent = displayBpm;
-        currentBpm = (displayBpm !== '--') ? parseInt(displayBpm) : null;
-        saveButton.disabled = (currentBpm === null);
-
-        const lastInterval = intervals[intervals.length - 1];
-        if (lastInterval) {
-            const lastBpm = Math.round(60 / (lastInterval / 1000));
-            lastTap.textContent = `Последний: ${lastBpm} BPM`;
+        // Отображение последнего интервала (если есть)
+        if (count >= 2) {
+            const lastInterval = taps[taps.length - 1] - taps[taps.length - 2];
+            if (lastInterval > 0) {
+                const lastBpm = Math.round(60 / (lastInterval / 1000));
+                lastTap.textContent = `Последний: ${lastBpm} BPM`;
+            } else {
+                lastTap.textContent = 'Последний: --';
+            }
         } else {
-            lastTap.textContent = 'Последний: --';
+            // Если нажатий меньше 2, показываем последний сохранённый BPM (если есть)
+            if (lastValidBpm !== null) {
+                lastTap.textContent = `Последний: ${lastValidBpm} BPM`;
+            } else {
+                lastTap.textContent = 'Последний: --';
+            }
         }
     }
 
     function addTap() {
         const now = Date.now();
+
+        // Если прошло много времени после последнего нажатия — начинаем новый отсчёт
         if (taps.length > 0 && (now - taps[taps.length - 1]) > TIMEOUT_MS) {
-            taps = [];
-            clearTimeout(timeoutId);
-            timeoutId = null;
+            taps = [];                // сбрасываем историю, но lastValidBpm остаётся
         }
+
         taps.push(now);
         if (taps.length > MAX_TAPS) {
             taps.shift();
         }
         updateUI();
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-            taps = [];
-            updateUI();
-            timeoutId = null;
-        }, TIMEOUT_MS);
     }
 
     function resetTaps() {
         taps = [];
-        clearTimeout(timeoutId);
-        timeoutId = null;
+        lastValidBpm = null;          // полный сброс
         updateUI();
         bpmValue.style.color = '#e94560';
         setTimeout(() => bpmValue.style.color = '', 200);
     }
 
-    // ---------- Обработчики кнопок ----------
+    // ---------- Обработчики событий ----------
     tapButton.addEventListener('click', addTap);
     tapButton.addEventListener('touchstart', (e) => {
         e.preventDefault();
@@ -296,7 +285,6 @@
     resetButton.addEventListener('click', resetTaps);
     saveButton.addEventListener('click', openSaveModal);
 
-    // ---------- Фильтр и сортировка ----------
     filterInput.addEventListener('input', renderRecords);
     sortSelect.addEventListener('change', renderRecords);
 
@@ -306,14 +294,12 @@
             alert('Нет записей для экспорта');
             return;
         }
-        // Заголовок: BPM,Название
         let csv = 'BPM,Название\n';
         records.forEach(rec => {
-            // Экранируем кавычки в названии
             const name = rec.name.replace(/"/g, '""');
             csv += `${rec.bpm},"${name}"\n`;
         });
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM для Excel
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.href = url;
@@ -327,9 +313,7 @@
     exportBtn.addEventListener('click', exportCSV);
 
     // ---------- Импорт CSV ----------
-    importBtn.addEventListener('click', () => {
-        importFile.click();
-    });
+    importBtn.addEventListener('click', () => importFile.click());
 
     importFile.addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -342,22 +326,14 @@
                 alert('Файл пуст или неверный формат');
                 return;
             }
-            // Проверяем заголовок (может быть с BOM)
-            let firstLine = lines[0].replace(/^\uFEFF/, '');
-            if (!firstLine.includes('BPM') && !firstLine.includes('Название')) {
-                // Если нет заголовка, считаем что первая строка - данные
-                // Но мы всё равно попробуем парсить
-            }
             let imported = 0;
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].replace(/^\uFEFF/, '');
-                // Парсим CSV с учётом кавычек
                 const parts = parseCSVLine(line);
                 if (parts.length >= 2) {
                     const bpm = parseInt(parts[0]);
                     const name = parts[1].trim();
                     if (!isNaN(bpm) && name) {
-                        // Проверяем, нет ли уже такой записи (по названию и bpm)
                         const exists = records.some(r => r.name === name && r.bpm === bpm);
                         if (!exists) {
                             records.push({
@@ -378,12 +354,11 @@
             } else {
                 alert('Не удалось импортировать записи. Проверьте формат (BPM,Название)');
             }
-            importFile.value = ''; // сброс
+            importFile.value = '';
         };
         reader.readAsText(file, 'UTF-8');
     });
 
-    // Простой парсер CSV-строки (учитывает кавычки)
     function parseCSVLine(line) {
         const result = [];
         let current = '';
@@ -419,9 +394,5 @@
     renderRecords();
     updateUI();
 
-    // Автосохранение при закрытии страницы (на всякий случай)
-    window.addEventListener('beforeunload', () => {
-        saveRecords();
-    });
-
+    window.addEventListener('beforeunload', saveRecords);
 })();
